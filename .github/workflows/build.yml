@@ -25,12 +25,25 @@ jobs:
             curl \
             dpkg \
             xz-utils \
-            unzip
+            unzip \
+            zip \
+            rsync \
+            libxml2
 
       - name: Install Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+      - name: Install iOS SDK
+        run: |
+          export THEOS=$HOME/theos
+          $THEOS/bin/install-sdk latest
+
+      - name: Check SDK
+        run: |
+          ls -lah $HOME/theos/sdks
+          find $HOME/theos/sdks -maxdepth 1 -type d -name "iPhoneOS*.sdk" -print
 
       - name: Build package
         run: |
