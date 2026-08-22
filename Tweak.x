@@ -5,7 +5,32 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
 #import "image_utils.h"
+
+static int vcamLogFD = -1;
+
+static void VCamFileLog(const char *text) {
+    static dispatch_once_t onceToken;
+
+    dispatch_once(&onceToken, ^{
+        vcamLogFD = open(
+            "/var/mobile/vcam-debug.log",
+            O_CREAT | O_WRONLY | O_APPEND,
+            0644
+        );
+    });
+
+    if (vcamLogFD < 0 || text == NULL) {
+        return;
+    }
+
+    write(vcamLogFD, text, strlen(text));
+}
 
 %hook BWNodeOutput
 
@@ -25,7 +50,8 @@
         CMSampleBufferGetImageBuffer(sampleBuffer);
 
     if (originalImageBuffer == NULL) {
-        NSLog(@"[VCAM-DEBUG] imageBuffer=NULL");
+        VCamFileLog("[VCAM-DEBUG] imageBuffer=NULL\n");
+
         %orig(sampleBuffer);
         return;
     }
@@ -48,17 +74,19 @@
             CVPixelBufferGetPlaneCount(originalImageBuffer);
 
         char fmt[5];
+
         fmt[0] = (format >> 24) & 0xFF;
         fmt[1] = (format >> 16) & 0xFF;
         fmt[2] = (format >> 8) & 0xFF;
         fmt[3] = format & 0xFF;
         fmt[4] = '\0';
 
-        CMTime pts =
-            CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+        char line[512];
 
-        NSLog(
-            @"[VCAM-DEBUG] ptr=%p media=%c%c%c%c format=%s 0x%08x size=%zux%zu planes=%zu pts=%lld/%d",
+        snprintf(
+            line,
+            sizeof(line),
+            "[VCAM-DEBUG] ptr=%p media=%c%c%c%c format=%s 0x%08x size=%zux%zu planes=%zu\n",
             self,
             (mediaType >> 24) & 0xFF,
             (mediaType >> 16) & 0xFF,
@@ -68,10 +96,10 @@
             (unsigned int)format,
             width,
             height,
-            planes,
-            (long long)pts.value,
-            pts.timescale
+            planes
         );
+
+        VCamFileLog(line);
     }
     // ===== LOGGER END =====
 
