@@ -1,17 +1,31 @@
+#import <Foundation/Foundation.h>
+#import <CoreFoundation/CoreFoundation.h>
+#import <CoreMedia/CoreMedia.h>
+#import <CoreVideo/CoreVideo.h>
+#import <objc/runtime.h>
+#import <objc/message.h>
+
+#import "image_utils.h"
+
 %hook BWNodeOutput
 
 - (void)emitSampleBuffer:(CMSampleBufferRef)sampleBuffer {
-    unsigned int mediaType = ((unsigned int (*)(id, SEL))objc_msgSend)(self, sel_registerName("mediaType"));
+    unsigned int mediaType =
+        ((unsigned int (*)(id, SEL))objc_msgSend)(
+            self,
+            sel_registerName("mediaType")
+        );
 
     if (mediaType != 'vide') {
         %orig(sampleBuffer);
         return;
     }
 
-    CVPixelBufferRef originalImageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+    CVPixelBufferRef originalImageBuffer =
+        CMSampleBufferGetImageBuffer(sampleBuffer);
 
     if (originalImageBuffer == NULL) {
-        NSLog(@"[VCAM-DEBUG] imageBuffer=NULL node=%@", NSStringFromClass([self class]));
+        NSLog(@"[VCAM-DEBUG] imageBuffer=NULL");
         %orig(sampleBuffer);
         return;
     }
@@ -21,10 +35,17 @@
     debugCounter++;
 
     if (debugCounter % 30 == 0) {
-        OSType format = CVPixelBufferGetPixelFormatType(originalImageBuffer);
-        size_t width = CVPixelBufferGetWidth(originalImageBuffer);
-        size_t height = CVPixelBufferGetHeight(originalImageBuffer);
-        size_t planes = CVPixelBufferGetPlaneCount(originalImageBuffer);
+        OSType format =
+            CVPixelBufferGetPixelFormatType(originalImageBuffer);
+
+        size_t width =
+            CVPixelBufferGetWidth(originalImageBuffer);
+
+        size_t height =
+            CVPixelBufferGetHeight(originalImageBuffer);
+
+        size_t planes =
+            CVPixelBufferGetPlaneCount(originalImageBuffer);
 
         char fmt[5];
         fmt[0] = (format >> 24) & 0xFF;
@@ -33,11 +54,11 @@
         fmt[3] = format & 0xFF;
         fmt[4] = '\0';
 
-        CMTime pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+        CMTime pts =
+            CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
 
         NSLog(
-            @"[VCAM-DEBUG] node=%@ ptr=%p media=%c%c%c%c format=%s 0x%08x size=%zux%zu planes=%zu pts=%lld/%d",
-            NSStringFromClass([self class]),
+            @"[VCAM-DEBUG] ptr=%p media=%c%c%c%c format=%s 0x%08x size=%zux%zu planes=%zu pts=%lld/%d",
             self,
             (mediaType >> 24) & 0xFF,
             (mediaType >> 16) & 0xFF,
@@ -48,7 +69,7 @@
             width,
             height,
             planes,
-            pts.value,
+            (long long)pts.value,
             pts.timescale
         );
     }
